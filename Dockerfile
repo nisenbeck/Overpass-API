@@ -1,4 +1,8 @@
+ARG OVERPASS_VERSION=0.7.62
+
 FROM nginx:1.29-bookworm-otel AS builder
+
+ARG OVERPASS_VERSION
 
 RUN apt-get update \
     && apt-get upgrade -y \
@@ -10,7 +14,6 @@ RUN apt-get update \
         ca-certificates \
         curl \
         expat \
-        fcgiwrap \
         g++ \
         libexpat1-dev \
         liblz4-1 \
@@ -18,25 +21,15 @@ RUN apt-get update \
         libtool \
         m4 \
         make \
-        osmium-tool \
-        python3 \
-        python3-venv \
-        supervisor \
-        wget \
         zlib1g \
         zlib1g-dev
 
-ADD http://dev.overpass-api.de/releases/osm-3s_v{version}.tar.gz /app/src.tar.gz
+ADD https://dev.overpass-api.de/releases/osm-3s_v${OVERPASS_VERSION}.tar.gz /app/src.tar.gz
 
 RUN  mkdir -p /app/src \
     && cd /app/src \
     && tar -x -z --strip-components 1 -f ../src.tar.gz \
-    && autoscan \
-    && aclocal \
-    && autoheader \
-    && libtoolize \
-    && automake --add-missing  \
-    && autoconf \
+    && autoreconf -fi \
     && CXXFLAGS='-O2' CFLAGS='-O2' ./configure --prefix=/app --enable-lz4 \
     && make dist \
     && make -j $(nproc) \
@@ -62,13 +55,12 @@ RUN apt-get update \
         python3 \
         python3-venv \
         supervisor \
-        wget \
         zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app /app
 
-ADD https://raw.githubusercontent.com/geofabrik/sendfile_osm_oauth_protector/master/oauth_cookie_client.py \
+ADD https://raw.githubusercontent.com/geofabrik/sendfile_osm_oauth_protector/7138406e45199647878b6757efc68e11786ee740/oauth_cookie_client.py \
     /app/bin/
 RUN sed -i -e 's/allow_read_prefs": "yes"/allow_read_prefs": "1"/g' /app/bin/oauth_cookie_client.py
 RUN addgroup overpass && adduser --home /db --disabled-password --gecos overpass --ingroup overpass overpass
@@ -78,7 +70,7 @@ COPY requirements.txt /app/
 RUN python3 -m venv /app/venv \
     && /app/venv/bin/pip install -r /app/requirements.txt --only-binary osmium
 
-RUN mkdir /nginx /docker-entrypoint-initdb.d && chown nginx:nginx /nginx && chown -R overpass:overpass /db
+RUN mkdir /nginx /docker-entrypoint-initdb.d && chown nginx:nginx /nginx && chown -R overpass:overpass /db && chmod 755 /db
 
 COPY etc/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
@@ -91,9 +83,9 @@ COPY docker-entrypoint.sh docker-healthcheck.sh /app/
 RUN chmod a+rx /app/docker-entrypoint.sh /app/bin/update_overpass.sh /app/bin/rules_loop.sh /app/bin/dispatcher_start.sh \
     /app/bin/oauth_cookie_client.py /app/bin/start_fcgiwarp.sh
 
-ENV OVERPASS_RULES_LOAD=${{OVERPASS_RULES_LOAD:-1}}
-ENV OVERPASS_USE_AREAS=${{OVERPASS_USE_AREAS:-true}}
-ENV OVERPASS_ALLOW_DUPLICATE_QUERIES=${{OVERPASS_ALLOW_DUPLICATE_QUERIES:-no}}
+ENV OVERPASS_RULES_LOAD=${OVERPASS_RULES_LOAD:-1}
+ENV OVERPASS_USE_AREAS=${OVERPASS_USE_AREAS:-true}
+ENV OVERPASS_ALLOW_DUPLICATE_QUERIES=${OVERPASS_ALLOW_DUPLICATE_QUERIES:-no}
 
 EXPOSE 80
 

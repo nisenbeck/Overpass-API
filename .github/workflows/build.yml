@@ -1,0 +1,169 @@
+name: Build Overpass API
+
+on:
+  workflow_dispatch:
+    inputs:
+      overpass_version:
+        description: "Overpass API Version (e.g. 0.7.62.10)"
+        required: true
+        type: string
+      latest:
+        description: "Also tag as :latest?"
+        required: false
+        type: boolean
+        default: false
+
+  schedule:
+    # Weekly check for new versions (Monday 06:00 UTC)
+    - cron: "0 6 * * 1"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/overpass-api
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.find-new.outputs.versions }}
+      has_new: ${{ steps.find-new.outputs.has_new }}
+      latest_version: ${{ steps.find-new.outputs.latest_version }}
+    if: github.event_name == 'schedule'
+    permissions:
+      packages: read
+
+    steps:
+      - name: Fetch available Overpass versions
+        run: |
+          curl -sf https://dev.overpass-api.de/releases/ \
+            | grep -oP 'osm-3s_v\K[0-9][0-9.]+(?=\.tar\.gz)' \
+            | sort -Vu > /tmp/all_versions.txt
+          echo "Found $(wc -l < /tmp/all_versions.txt) versions on server"
+
+      - name: Get existing GHCR tags
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Try user endpoint first, fall back to org endpoint
+          OWNER="${{ github.repository_owner }}"
+          gh api --paginate "/users/${OWNER}/packages/container/overpass-api/versions" \
+            --jq '.[].metadata.container.tags[]' 2>/dev/null \
+            | grep -E '^[0-9]' > /tmp/existing_tags.txt \
+            || touch /tmp/existing_tags.txt
+          echo "Found $(wc -l < /tmp/existing_tags.txt) existing version tags on GHCR"
+
+      - name: Find new versions
+        id: find-new
+        run: |
+          # Filter to >= 0.7.62.7
+          awk 'BEGIN{FS="."} $1==0 && $2==7 && ($3>62 || ($3==62 && $4>=7))' \
+            /tmp/all_versions.txt > /tmp/candidates.txt
+
+          # Remove already-built versions (grep -vxFf is sort-order independent)
+          if [ -s /tmp/existing_tags.txt ]; then
+            grep -vxFf /tmp/existing_tags.txt /tmp/candidates.txt > /tmp/new_versions.txt || true
+          else
+            cp /tmp/candidates.txt /tmp/new_versions.txt
+          fi
+
+          if [ -s /tmp/new_versions.txt ]; then
+            echo "New versions to build:"
+            cat /tmp/new_versions.txt
+
+            MATRIX=$(jq -Rc . /tmp/new_versions.txt | jq -sc .)
+            LATEST=$(sort -V /tmp/new_versions.txt | tail -1)
+
+            echo "versions=${MATRIX}" >> "$GITHUB_OUTPUT"
+            echo "has_new=true" >> "$GITHUB_OUTPUT"
+            echo "latest_version=${LATEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "All versions up to date"
+            echo "has_new=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-new:
+    needs: check-versions
+    if: needs.check-versions.outputs.has_new == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.check-versions.outputs.versions) }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine tags
+        id: tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.version }}"
+          if [ "${{ matrix.version }}" = "${{ needs.check-versions.outputs.latest_version }}" ]; then
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            OVERPASS_VERSION=${{ matrix.version }}
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine tags
+        id: tags
+        run: |
+          TAGS="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.overpass_version }}"
+          if [ "${{ inputs.latest }}" = "true" ]; then
+            TAGS="${TAGS},${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            OVERPASS_VERSION=${{ inputs.overpass_version }}
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
