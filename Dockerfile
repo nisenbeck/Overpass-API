@@ -1,4 +1,4 @@
-ARG OVERPASS_VERSION=0.7.62
+ARG OVERPASS_VERSION=0.7.62.7
 
 FROM nginx:1.29-bookworm-otel AS builder
 
@@ -60,7 +60,10 @@ RUN apt-get update \
 
 COPY --from=builder /app /app
 
-ADD https://raw.githubusercontent.com/geofabrik/sendfile_osm_oauth_protector/7138406e45199647878b6757efc68e11786ee740/oauth_cookie_client.py \
+# https://github.com/geofabrik/sendfile_osm_oauth_protector
+# Pinned to commit 7138406 (2024-02-15, "add logging, handle already granted authorizations")
+ARG OAUTH_CLIENT_COMMIT=7138406e45199647878b6757efc68e11786ee740
+ADD https://raw.githubusercontent.com/geofabrik/sendfile_osm_oauth_protector/${OAUTH_CLIENT_COMMIT}/oauth_cookie_client.py \
     /app/bin/
 RUN sed -i -e 's/allow_read_prefs": "yes"/allow_read_prefs": "1"/g' /app/bin/oauth_cookie_client.py
 RUN addgroup overpass && adduser --home /db --disabled-password --gecos overpass --ingroup overpass overpass

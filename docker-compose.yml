@@ -6,8 +6,8 @@ services:
     build:
       context: .
       args:
-        OVERPASS_VERSION: ${OVERPASS_VERSION:-0.7.62}
-    image: ghcr.io/${GHCR_OWNER:-local}/overpass-api:${OVERPASS_VERSION:-0.7.62}
+        OVERPASS_VERSION: ${OVERPASS_VERSION:-0.7.62.7}
+    image: ghcr.io/nisenbeck/overpass-api:${OVERPASS_VERSION:-0.7.62.7}
     container_name: overpass
     ports:
       - 12345:80
