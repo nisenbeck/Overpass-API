@@ -14,8 +14,8 @@ on:
         default: false
 
   schedule:
-    # Weekly check for new versions (Monday 06:00 UTC)
-    - cron: "0 6 * * 1"
+    # Weekly check for new versions (Sunday 02:00 UTC)
+    - cron: "0 2 * * 0"
 
 env:
   REGISTRY: ghcr.io

@@ -2,7 +2,7 @@
 
 By default, this image will clone an existing Overpass server for the whole planet, and make it available at `http://localhost/api/interpreter`.
 
-The following enviroment variables can be used to customize the setup:
+The following environment variables can be used to customize the setup:
 
 * `OVERPASS_MODE` - takes the value of either `init` or `clone`. Defaults to `clone`.
 * `OVERPASS_META` - `attic`, `yes`, or `no`. Passed as `--keep-attic`, `--meta`, or nothing to `update_database` and `init`. Defaults to `no`.
@@ -39,12 +39,12 @@ Image works in two modes `init` or `clone`. This affects how the instance gets i
 ### Running
 
 To monitor the progress of file downloads, run with the stdin (`-i`) and TTY  (`-t`) flags:
-`docker run -i -t wiktorn/overpass-api`
+`docker run -i -t ghcr.io/nisenbeck/overpass-api`
 
 After initialization is finished, the Docker container will stop. Once you start it again (with `docker start` command) it will start downloading diffs, applying them to database, and serving API requests.
 
 The container exposes port 80. Map it to your host port using `-p`:
-`docker run -p 80:80 wiktorn/overpass-api`
+`docker run -p 80:80 ghcr.io/nisenbeck/overpass-api`
 
 The Overpass API will then be available at `http://localhost:80/api/interpreter`.
 
@@ -52,27 +52,41 @@ Container includes binaries of pyosmium (in `/app/venv/bin/`) and osmium-tool (i
 
 All data resides within the `/db` directory in the container.
 
-For convenience, a [`docker-compose.yml` template](./docker-compose.yml) is included.
+For convenience, a [`docker-compose.yml`](./docker-compose.yml) is included.
+
+### Building
+
+To build locally for a specific Overpass version:
+
+```
+docker build --build-arg OVERPASS_VERSION=0.7.62.7 -t overpass-api:0.7.62.7 .
+```
+
+Images are also built automatically via GitHub Actions:
+- **Weekly** (Sunday 02:00 UTC): checks for new Overpass releases and builds any missing versions
+- **Manual**: trigger a build for a specific version via workflow_dispatch
 
 # Examples
 
 ## Overpass instance covering part of the world
 
 In this example the Overpass instance will be initialized with a planet file for Monaco downloaded from Geofabrik.
+Since Geofabrik provides PBF files, `OVERPASS_PLANET_PREPROCESS` is used to convert to the osm.bz2 format required by Overpass.
 Data will be stored in folder`/big/docker/overpass_db/` on the host machine and will not contain metadata as this example uses public Geofabrik extracts that do not contain metadata (such as changeset and user).
 Overpass will be available on port 12345 on the host machine.
 
 ```
 docker run \
-  -e OVERPASS_META=yes \
+  -e OVERPASS_META=no \
   -e OVERPASS_MODE=init \
-  -e OVERPASS_PLANET_URL=http://download.geofabrik.de/europe/monaco-latest.osm.bz2 \
-  -e OVERPASS_DIFF_URL=http://download.openstreetmap.fr/replication/europe/monaco/minute/ \
+  -e OVERPASS_PLANET_URL=https://download.geofabrik.de/europe/monaco-latest.osm.pbf \
+  -e OVERPASS_DIFF_URL=https://download.geofabrik.de/europe/monaco-updates/ \
+  -e OVERPASS_PLANET_PREPROCESS='mv /db/planet.osm.bz2 /db/planet.osm.pbf && osmium cat -o /db/planet.osm.bz2 /db/planet.osm.pbf && rm /db/planet.osm.pbf' \
   -e OVERPASS_RULES_LOAD=10 \
   -v /big/docker/overpass_db/:/db \
   -p 12345:80 \
   -i -t \
-  --name overpass_monaco wiktorn/overpass-api
+  --name overpass_monaco ghcr.io/nisenbeck/overpass-api
 ```
 
 ## Overpass clone covering whole world
@@ -89,7 +103,7 @@ docker run \
   -p 12346:80 \
   -i -t \
   --name overpass_world \
-  wiktorn/overpass-api
+  ghcr.io/nisenbeck/overpass-api
 ```
 
 ## Overpass instance covering part of the world using cookie
@@ -125,7 +139,7 @@ docker run \
     -v /big/docker/overpass_db/:/db \
     -p 12347:80 \
     -i -t \
-    --name overpass_monaco wiktorn/overpass-api
+    --name overpass_monaco ghcr.io/nisenbeck/overpass-api
 ```
 
 ## Healthcheck checking that instance is up-to-date
@@ -151,7 +165,7 @@ healthcheck will verify the date of last update of Overpass instance and if data
 
 The Overpass API will be exposed on the port exposed by `docker run` - for example `http://localhost:12346/api/interpreter`.
 
-You may then use this directly as an Overpass API url, or use it within [Overpass Turbo](http://overpass-turbo.eu/).
+You may then use this directly as an Overpass API url, or use it within [Overpass Turbo](https://overpass-turbo.eu/).
 
 Try a direct query with `http://localhost:12346/api/interpreter?data=node(3470507586);out geom;`, which should return a pub in Dublin.
 
