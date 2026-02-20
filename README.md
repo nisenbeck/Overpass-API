@@ -1,5 +1,8 @@
 # How to use this image
 
+> [!NOTE]
+> This is a fork of [wiktorn/Overpass-API](https://github.com/wiktorn/Overpass-API) with single-version builds, GitHub Actions CI, and GHCR publishing. All credit for the original Docker setup goes to [wiktorn](https://github.com/wiktorn). Licensed under [MIT](./LICENSE).
+
 By default, this image will clone an existing Overpass server for the whole planet, and make it available at `http://localhost/api/interpreter`.
 
 The following environment variables can be used to customize the setup:
