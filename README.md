@@ -69,6 +69,9 @@ Images are also built automatically via GitHub Actions:
 - **Weekly** (Sunday 02:00 UTC): checks for new Overpass releases and builds any missing versions
 - **Manual**: trigger a build for a specific version via workflow_dispatch
 
+> [!CAUTION]
+> The `:latest` tag always points to the highest available version and is updated automatically. There is no verification that new images work correctly. **Always pin to a specific version tag** (e.g. `ghcr.io/nisenbeck/overpass-api:0.7.62.7`). The included [`docker-compose.yml`](./docker-compose.yml) defaults to the latest tested version.
+
 # Examples
 
 ## Overpass instance covering part of the world
