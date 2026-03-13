@@ -62,7 +62,7 @@ For convenience, a [`docker-compose.yml`](./docker-compose.yml) is included.
 To build locally for a specific Overpass version:
 
 ```
-docker build --build-arg OVERPASS_VERSION=0.7.62.7 -t overpass-api:0.7.62.7 .
+docker build --build-arg OVERPASS_VERSION=0.7.62.10 -t overpass-api:0.7.62.10 .
 ```
 
 Images are also built automatically via GitHub Actions:
@@ -70,7 +70,7 @@ Images are also built automatically via GitHub Actions:
 - **Manual**: trigger a build for a specific version via workflow_dispatch
 
 > [!CAUTION]
-> The `:latest` tag always points to the highest available version and is updated automatically. There is no verification that new images work correctly. **Always pin to a specific version tag** (e.g. `ghcr.io/nisenbeck/overpass-api:0.7.62.7`). The included [`docker-compose.yml`](./docker-compose.yml) defaults to the latest tested version.
+> The `:latest` tag always points to the highest available version and is updated automatically. There is no verification that new images work correctly. **Always pin to a specific version tag** (e.g. `ghcr.io/nisenbeck/overpass-api:0.7.62.10`). The included [`docker-compose.yml`](./docker-compose.yml) defaults to the latest tested version.
 
 # Examples
 

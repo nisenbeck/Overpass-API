@@ -1,4 +1,4 @@
-ARG OVERPASS_VERSION=0.7.62.7
+ARG OVERPASS_VERSION=0.7.62.10
 
 FROM nginx:1.29-bookworm-otel AS builder
 
